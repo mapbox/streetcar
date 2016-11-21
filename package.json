@@ -1,0 +1,42 @@
+{
+  "name": "streetcar",
+  "description": "Tools for processing streetlevel imagery",
+  "version": "0.0.0",
+  "main": "index.js",
+  "license": "ISC",
+  "author": "Bryan Housel <bryan@mapbox.com>",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mapbox/streetcar.git"
+  },
+  "bugs": "https://github.com/mapbox/streetcar/issues",
+  "directories": {
+    "bin": "./bin"
+  },
+  "keywords": [
+    "camera",
+    "imagery",
+    "streetlevel",
+    "streetview"
+  ],
+  "dependencies": {
+    "bytes": "~2.4.0",
+    "dms2dec": "~1.1.0",
+    "fast-exif": "~0.2.0",
+    "fs-extra": "~0.30.0",
+    "geojsonio-cli": "~0.2.0",
+    "minimist": "~1.2.0",
+    "@turf/turf": "~3.5.0"
+  },
+  "devDependencies": {
+    "eslint": "~3.5.0",
+    "tap": "~7.1.0"
+  },
+  "engines": {
+    "node": ">=4.0.0"
+  },
+  "scripts": {
+    "lint": "eslint index.js test/",
+    "test": "npm run lint && tap --cov test/*.js"
+  }
+}

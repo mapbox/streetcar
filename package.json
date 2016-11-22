@@ -24,6 +24,7 @@
     "dms2dec": "~1.1.0",
     "fast-exif": "~0.2.0",
     "fs-extra": "~0.30.0",
+    "glob": "~7.1.1",
     "geojsonio-cli": "~0.2.0",
     "minimist": "~1.2.0",
     "@turf/turf": "~3.5.0"
@@ -36,7 +37,7 @@
     "node": ">=4.0.0"
   },
   "scripts": {
-    "lint": "eslint index.js test/",
+    "lint": "eslint index.js bin/ test/",
     "test": "npm run lint && tap --cov test/*.js"
   }
 }

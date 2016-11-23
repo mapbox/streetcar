@@ -224,6 +224,7 @@ function processData() {
 
     for (let t = 0; t < times.length; t++) {
         let tNow = +times[t];
+        let foundCoords = false;
         let sequence;
 
         if (tNow - tPrevious >= cutSequenceTime) {
@@ -237,7 +238,6 @@ function processData() {
             sequence = sequences[sequences.length - 1];
         }
 
-
         for (let c = 0; c < cameras.length; c++) {
             let camera = cameras[c];
 
@@ -248,12 +248,11 @@ function processData() {
             let bytes = allfiles[file].bytes;
             let coord = data.coord;
 
-            // No valid coordinates found from any camera at this time.
-            // This could happen if the driver went through a tunnel or something.
-            // In this case, just skip this time.
-            if (!Array.isArray(coord) || coord.length < 2) {
+            if (Array.isArray(coord) && coord.length >= 2) {
+                foundCoords = true;
+            } else {
+                // TODO: warning
                 coord = undefined;
-                //warning
             }
 
             if (!sequence[camera]) {
@@ -272,7 +271,13 @@ function processData() {
             };
         }
 
-        tPrevious = tNow;
+        // It's possible there were no gps coordinates for any camera at this time.
+        // This could happen if the driver went through a tunnel or something.
+        // In this case, just ignore this tNow time.
+
+        if (foundCoords) {
+            tPrevious = tNow;
+        }
     }
 
 

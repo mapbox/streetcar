@@ -502,7 +502,10 @@ This program will:
 1. Create a .streetcar/ folder if it does not already exist
 2. Find image files recursively in and below the current folder
 3. Parse EXIF data from the image files to gather capture times and GPS coordinates.
-4. Generate a GeoJSON file with the resulting coordinates as a LineString
+4. Split into sequences (a gap of >5sec starts a new sequence)
+5. Create sequence folders under .streeetcar
+6. Symlink the image files into the appropriate sequence folder
+7. Generate GeoJSON files for each sequence, with the image coordinates as a LineString
 
 Usage:
   $ streetcar-init

@@ -115,7 +115,7 @@ function showHelp() {
     let help = `
 streetcar-info
 
-Print statistics on a streetcar geojson file.
+Print statistics on streetcar geojson files.
 Statistics include miles and time.
 
 Usage:

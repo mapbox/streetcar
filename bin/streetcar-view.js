@@ -2,6 +2,7 @@
 'use strict';
 
 const fs = require('fs-extra');
+const glob = require('glob');
 const path = require('path');
 const pkg = require('../package.json');
 const spawn = require('child_process').spawn;
@@ -26,18 +27,22 @@ const argv = require('minimist')(process.argv.slice(2), {
     }
 
     let scfolder = getStreetcarFolder();
-    let infile = path.normalize(`${scfolder}/streetcar.geojson`);
-    let cmd = path.normalize(`${__dirname}/../node_modules/geojsonio-cli/geojsonio.js`);
 
-    try {
-        fs.statSync(infile);
-        const child = spawn(cmd, [infile], { detached: true, stdio: 'ignore' });
-        child.unref();
+    // find geojson files
+    let files = glob.sync(`${scfolder}/sequence*/sequence*.geojson`);
+    files.forEach(function(file) {
+        let cmd = path.normalize(`${__dirname}/../node_modules/geojsonio-cli/geojsonio.js`);
 
-    } catch (err) {
-        console.error(err.message);
-        process.exit(1);
-    }
+        try {
+            fs.statSync(file);
+            const child = spawn(cmd, [file], { detached: true, stdio: 'ignore' });
+            child.unref();
+
+        } catch (err) {
+            console.error(err.message);
+            process.exit(1);
+        }
+    });
 
 })();
 
@@ -61,7 +66,7 @@ function showHelp() {
     let help = `
 streetcar-view
 
-View a streetcar file on geojson.io
+View all sequence files under .streetcar folder on geojson.io
 
 Usage:
   $ streetcar-view

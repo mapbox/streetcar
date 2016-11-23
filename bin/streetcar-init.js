@@ -94,28 +94,25 @@ let scfolder = `${cwd}/.streetcar`;
 })();
 
 
+function getSlug(slugDate) {
+    let dateStr = '' + slugDate.getUTCFullYear() + '_' +
+            ('0' + (slugDate.getUTCMonth() + 1)).slice(-2) + '_' +
+            ('0' + slugDate.getUTCDate()).slice(-2);
 
-function getSlug() {
-    let slug = path.basename(cwd);
-    if (slug === '') {
+    let nameStr = path.basename(cwd);
+    if (nameStr === '') {
         if (verbose >= 1) { console.error('No folder name.  Did you run this in the root folder?'); }
         process.exit(1);
     }
 
-    let matches = slug.match(/^[^A-Za-z]*(.*)$/);  // capture where letters start
+    let matches = nameStr.match(/^[^A-Za-z]*(.*)$/);  // capture where letters start
     if (matches && matches[1]) {
-        slug = matches[1];
+        nameStr = matches[1];
     }
 
-    slug = slug.toLowerCase();
-    return slug;
-}
+    nameStr = nameStr.toLowerCase();
 
-
-function getSlugDate(d) {
-    return '' + d.getUTCFullYear() + '_' +
-        ('0' + (d.getUTCMonth() + 1)).slice(-2) + '_' +
-        ('0' + d.getUTCDate()).slice(-2);
+    return dateStr + '-' + nameStr;
 }
 
 
@@ -366,13 +363,14 @@ function processData() {
         }
 
         // 3. export GeoJSON..
-        let dstart = new Date(+times[0]);
+        let dateStart = new Date(+times[0]);
+        let slug = getSlug(dateStart);
 
         let collectionProperties = {
             generator: pkg.name,
             version: pkg.version,
-            source: cwd,
-            slug: getSlugDate(dstart) + '-' + getSlug() + '-sequence' + s,
+            slug: slug,
+            sequence: `sequence${s}`,
             numFiles: seqFiles,
             numBytes: seqBytes,
             timeStart: seqTimeStart,

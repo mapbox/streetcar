@@ -29,6 +29,7 @@ const argv = require('minimist')(process.argv.slice(2), {
     let scfolder = getStreetcarFolder();
 
     // find geojson files
+    let fileCount = 0;
     let files = glob.sync(`${scfolder}/sequence*/sequence*.geojson`);
     files.forEach(function(file) {
         let gj;
@@ -41,6 +42,7 @@ const argv = require('minimist')(process.argv.slice(2), {
 
         /* slug */
         let slug = gj.collectionProperties.slug;
+        let sequence = gj.collectionProperties.sequence;
 
         /* time */
         let start = new Date(+gj.collectionProperties.timeStart);
@@ -60,6 +62,7 @@ const argv = require('minimist')(process.argv.slice(2), {
 
         let info = new Map([
             ['Slug', slug],
+            ['Sequence', sequence],
             ['Date', start.toDateString()],
             ['Start', start.toTimeString()],
             ['End', end.toTimeString()],
@@ -71,7 +74,9 @@ const argv = require('minimist')(process.argv.slice(2), {
         ]);
 
         if (argv.col) {
-            console.log([...info.keys()].join('\t'));
+            if (!fileCount++) {
+                console.log([...info.keys()].join('\t'));
+            }
             console.log([...info.values()].join('\t'));
         } else {
             console.log('');

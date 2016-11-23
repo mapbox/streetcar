@@ -27,9 +27,10 @@ let allfiles = {};
 let alltimes = {};
 let allcameras = {};
 let waitfor = 0;
+let counter = 0;
 let finished = false;
 let cwd = process.cwd();
-let scfile = '';
+let scfolder = `${cwd}/.streetcar`;
 
 
 (function main() {
@@ -48,37 +49,33 @@ let scfile = '';
         verbose = 0;
     }
 
-
-    let scfolder = getStreetcarFolder();
-    scfile = `${scfolder}/streetcar.geojson`;
-
-    if (verbose >= 2) {
-        console.log(`cwd = ${cwd}`);
-        console.log(`scfile = ${scfile}`);
-    }
-
-    // remove any existing sequence folders..
-    let seqfolders = glob.sync(`${cwd}/sequence*`);
-    seqfolders.forEach(function(folder) {
-        try {
-            fs.remove(folder);
-        } catch (err) {
-            if (verbose >= 1) { console.error(err.message); }
-            process.exit(1);
-        }
-    });
-
-    // scan the image folders..
+    // look for the image folders..
     let imagefolders = glob.sync(`${cwd}/+(front|back|rear|left|right)`, { nocase: true });
     let foldercount = imagefolders.length;
+    if (!foldercount) {
+        if (verbose >= 1) { console.error('No image folders found.  Expected "front", "back", etc.'); }
+        process.exit(1);
+    }
+
+    // remove contents of .streetcar folder, create if needed..
+    try {
+        fs.emptyDirSync(scfolder);
+    } catch (err) {
+        if (verbose >= 1) { console.error(err.message); }
+        process.exit(1);
+    }
+
+    let noHiddenFiles = function(item){
+        var basename = path.basename(item)
+        return basename === '.' || basename[0] !== '.'
+    }
+
+    // scan the image folders..
     imagefolders.forEach(function(folder) {
         let basename = path.basename(folder);
-        if (verbose >= 2) {
-            console.log('');
-            console.log(`---------- SCANNING ${basename} ----------`);
-        }
+        if (verbose >= 1) { console.log(`Found ${basename}`); }
 
-        fs.walk(folder)
+        fs.walk(folder, { filter: noHiddenFiles })
             .on('readable', function() {
                 let item;
                 while ((item = this.read())) {  // eslint-disable-line no-invalid-this
@@ -97,30 +94,11 @@ let scfile = '';
 })();
 
 
-function getStreetcarFolder() {
-    let folder = `${cwd}/.streetcar`;
-    try {
-        fs.ensureDirSync(folder);
-    } catch (err) {
-        if (verbose >= 1) { console.error(err.message); }
-        process.exit(1);
-    }
-    return folder;
-}
-
 
 function getSlug() {
-    let pathArr = cwd.split(path.sep);
-    let slug = '';
-
-    while (slug === '' && pathArr.length) {
-        slug = pathArr.pop();
-    }
-
+    let slug = path.basename(cwd);
     if (slug === '') {
-        if (verbose >= 1) {
-            console.error('No folder name.  Did you run this in the root folder?');
-        }
+        if (verbose >= 1) { console.error('No folder name.  Did you run this in the root folder?'); }
         process.exit(1);
     }
 
@@ -144,7 +122,6 @@ function getSlugDate(d) {
 function getCamera(filepath) {
     let s = filepath.toLowerCase();
     if (s.indexOf('streetcar') !== -1) return null;
-    if (s.indexOf('sequence') !== -1) return null;
 
     if (s.lastIndexOf('front') !== -1) return 'front';
     if (s.lastIndexOf('back') !== -1) return 'back';
@@ -162,9 +139,6 @@ function processFile(item) {
     if (!camera) return;
 
     if (!allcameras[camera]) {
-        if (verbose >= 2) {
-            console.log(`Found ${camera} camera`);
-        }
         allcameras[camera] = camera;
     }
 
@@ -216,7 +190,9 @@ function processFile(item) {
         });
 
     if (verbose === 1 && process.stdout.isTTY) {
-        process.stdout.write('.');
+        if (++counter % 100 === 0) {
+            process.stdout.write('.');
+        }
     }
 }
 
@@ -232,15 +208,16 @@ function finalize() {
 
 
 function processData() {
+    if (verbose >= 1 && process.stdout.isTTY) {
+        process.stdout.write('\n');
+    }
+
     let times = Object.keys(alltimes).sort();
     let cameras = Object.keys(allcameras);
 
 
-    // 1. cut into sequences
-    if (verbose >= 2) {
-        console.log('');
-        console.log('---------- CUT INTO SEQUENCES ----------');
-    }
+    // 1. split into sequences
+    if (verbose >= 1) { console.log(`Creating sequences`); }
 
     let tPrevious = 0;
     let sequences = [];
@@ -300,11 +277,6 @@ function processData() {
 
 
     // 2. Process each sequence.
-    if (verbose >= 2) {
-        console.log('');
-        console.log('---------- PROCESS SEQUENCES ----------');
-    }
-
     for (let s = 0; s < sequences.length; s++) {
         let sequence = sequences[s];
         let features = [];
@@ -313,14 +285,14 @@ function processData() {
         let seqFiles = 0;
         let seqBytes = 0;
 
-        if (verbose >= 2) { console.log(`Processing sequence${s}`); }
+        if (verbose >= 1) { console.log(`Processing sequence${s}`); }
 
         for (let c = 0; c < cameras.length; c++) {
             let camera = cameras[c];
             let sequenceCamera = sequence[camera];
             if (!sequenceCamera) continue;
 
-            if (verbose >= 2) { console.log(`  ${camera}`); }
+            if (verbose >= 1) { console.log(`  ${camera}`); }
             seqBytes += sequenceCamera.bytes;
 
             let seqTimes = Object.keys(sequenceCamera.times).sort();
@@ -340,7 +312,7 @@ function processData() {
                 let pathArr = imageFile.split(path.sep);
                 let basename = pathArr[pathArr.length - 1];
                 let container = pathArr[pathArr.length - 2];
-                let linkFile = `${cwd}/sequence${s}/${camera}/${container}/${basename}`;
+                let linkFile = `${scfolder}/sequence${s}/${camera}/${container}/${basename}`;
 
                 try {
                     fs.ensureSymlinkSync(imageFile, linkFile);
@@ -408,8 +380,8 @@ function processData() {
             features: features
         };
 
-        let geojsonFile = `${cwd}/sequence${s}/sequence${s}.geojson`;
-        if (verbose >= 2) { console.log(`  writing sequence${s}/sequence${s}.geojson`); }
+        let geojsonFile = `${scfolder}/sequence${s}/sequence${s}.geojson`;
+        if (verbose >= 2) { console.log(`  writing .streetcar/sequence${s}/sequence${s}.geojson`); }
         try {
             fs.ensureFileSync(geojsonFile);
             fs.writeJsonSync(geojsonFile, gj);

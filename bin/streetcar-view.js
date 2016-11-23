@@ -26,7 +26,7 @@ const argv = require('minimist')(process.argv.slice(2), {
     }
 
     let scfolder = getStreetcarFolder();
-    let infile = path.normalize(`${scfolder}streetcar.geojson`);
+    let infile = path.normalize(`${scfolder}/streetcar.geojson`);
     let cmd = path.normalize(`${__dirname}/../node_modules/geojsonio-cli/geojsonio.js`);
 
     try {
@@ -44,7 +44,7 @@ const argv = require('minimist')(process.argv.slice(2), {
 
 function getStreetcarFolder() {
     let cwd = process.cwd();
-    let folder = `${cwd}/.streetcar/`;
+    let folder = `${cwd}/.streetcar`;
 
     try {
         fs.ensureDirSync(folder);

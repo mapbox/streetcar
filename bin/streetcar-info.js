@@ -3,6 +3,7 @@
 
 const bytes = require('bytes');
 const fs = require('fs-extra');
+const glob = require('glob');
 const pkg = require('../package.json');
 const turf = require('@turf/turf');
 
@@ -26,62 +27,65 @@ const argv = require('minimist')(process.argv.slice(2), {
     }
 
     let scfolder = getStreetcarFolder();
-    let infile = `${scfolder}streetcar.geojson`;
-    let gj;
 
-    try {
-        gj = fs.readJsonSync(infile);
-    } catch (err) {
-        console.error(err.message);
-        process.exit(1);
-    }
+    // find geojson files
+    let files = glob.sync(`${scfolder}/sequence*/sequence*.geojson`);
+    files.forEach(function(file) {
+        let gj;
+        try {
+            gj = fs.readJsonSync(file);
+        } catch (err) {
+            console.error(err.message);
+            process.exit(1);
+        }
 
-    /* slug */
-    let slug = gj.collectionProperties.slug;
+        /* slug */
+        let slug = gj.collectionProperties.slug;
 
-    /* time */
-    let start = new Date(+gj.collectionProperties.timeStart);
-    let end = new Date(+gj.collectionProperties.timeEnd);
-    let diff = Math.floor((end - start) / 1000);  // milliseconds to seconds
+        /* time */
+        let start = new Date(+gj.collectionProperties.timeStart);
+        let end = new Date(+gj.collectionProperties.timeEnd);
+        let diff = Math.floor((end - start) / 1000);  // milliseconds to seconds
 
-    /* distance */
-    let front = gj.features[0];
-    let miles = turf.lineDistance(front, 'miles').toFixed(2);
+        /* distance */
+        let front = gj.features[0];
+        let miles = turf.lineDistance(front, 'miles').toFixed(2);
 
-    /* speed */
-    let mph = (miles / (diff / 3600)).toFixed(2);
+        /* speed */
+        let mph = (miles / (diff / 3600)).toFixed(2);
 
-    /* files */
-    let files = +gj.collectionProperties.numFiles;
-    let size = bytes(gj.collectionProperties.numBytes, { unitSeparator: ' ' });
+        /* files */
+        let files = +gj.collectionProperties.numFiles;
+        let size = bytes(gj.collectionProperties.numBytes, { unitSeparator: ' ' });
 
-    let info = new Map([
-        ['Slug', slug],
-        ['Date', start.toDateString()],
-        ['Start', start.toTimeString()],
-        ['End', end.toTimeString()],
-        ['Duration', toDurationString(diff)],
-        ['Distance', miles + ' mi'],
-        ['Avg Speed', mph + 'mph'],
-        ['Files', files + ' files'],
-        ['Size', size]
-    ]);
+        let info = new Map([
+            ['Slug', slug],
+            ['Date', start.toDateString()],
+            ['Start', start.toTimeString()],
+            ['End', end.toTimeString()],
+            ['Duration', toDurationString(diff)],
+            ['Distance', miles + ' mi'],
+            ['Avg Speed', mph + 'mph'],
+            ['Files', files + ' files'],
+            ['Size', size]
+        ]);
 
-    if (argv.col) {
-        console.log([...info.keys()].join('\t'));
-        console.log([...info.values()].join('\t'));
-    } else {
-        console.log('');
-        info.forEach((v,k) => console.log(`\t${k}:\t${k.length < 8 ? '\t' : ''}${v}`));
-        console.log('');
-    }
+        if (argv.col) {
+            console.log([...info.keys()].join('\t'));
+            console.log([...info.values()].join('\t'));
+        } else {
+            console.log('');
+            info.forEach((v,k) => console.log(`\t${k}:\t${k.length < 8 ? '\t' : ''}${v}`));
+            console.log('');
+        }
+    });
 
 })();
 
 
 function getStreetcarFolder() {
     let cwd = process.cwd();
-    let folder = `${cwd}/.streetcar/`;
+    let folder = `${cwd}/.streetcar`;
 
     try {
         fs.ensureDirSync(folder);

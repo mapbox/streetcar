@@ -26,7 +26,6 @@ let verbose = 1;  // 0 = quiet, 1 = normal, 2 = debug, 3 = all exif
 let allfiles = {};
 let alltimes = {};
 let allcameras = {};
-let bytes = 0;
 let waitfor = 0;
 let finished = false;
 let cwd = process.cwd();
@@ -175,7 +174,6 @@ function processFile(item) {
     exif.read(item.path)
         .then(data => {
             let basename = path.basename(item.path);
-            bytes += item.stats.size;
 
             if (!data || !Object.keys(data).length || !data.exif) {
                 if (verbose >= 2) { console.log(`${basename}:  No exif!`); }
@@ -190,6 +188,7 @@ function processFile(item) {
 
             let copy = deepCopy(data);
             allfiles[item.path].data = copy;
+            allfiles[item.path].bytes = item.stats.size;
 
             let t = imageTime.getTime();
             if (!alltimes[t]) {
@@ -235,9 +234,6 @@ function finalize() {
 function processData() {
     let times = Object.keys(alltimes).sort();
     let cameras = Object.keys(allcameras);
-    let features = [];
-    let sequences = [];
-    let tPrevious = 0;
 
 
     // 1. cut into sequences
@@ -245,6 +241,9 @@ function processData() {
         console.log('');
         console.log('---------- CUT INTO SEQUENCES ----------');
     }
+
+    let tPrevious = 0;
+    let sequences = [];
 
     for (let t = 0; t < times.length; t++) {
         let tNow = +times[t];
@@ -269,6 +268,7 @@ function processData() {
             if (!file) continue;
 
             let data = extractExif(allfiles[file].data);
+            let bytes = allfiles[file].bytes;
             let coord = data.coord;
 
             // No valid coordinates found from any camera at this time.
@@ -282,16 +282,17 @@ function processData() {
             if (!sequence[camera]) {
                 sequence[camera] = {
                     meta: {},
+                    bytes: 0,
                     times: {}
                 };
             }
 
+            setCameraMetadata(sequence[camera].meta, data);
+            sequence[camera].bytes += bytes;
             sequence[camera].times[tNow] = {
                 coord: coord,
                 file: file
             };
-
-            setCameraMetadata(sequence[camera].meta, data);
         }
 
         tPrevious = tNow;
@@ -306,20 +307,35 @@ function processData() {
 
     for (let s = 0; s < sequences.length; s++) {
         let sequence = sequences[s];
+        let features = [];
+        let seqTimeStart = 0;
+        let seqTimeEnd = 0;
+        let seqFiles = 0;
+        let seqBytes = 0;
 
-        if (verbose >= 2) { console.log(`sequence${s}`); }
+        if (verbose >= 2) { console.log(`Processing sequence${s}`); }
 
         for (let c = 0; c < cameras.length; c++) {
             let camera = cameras[c];
             let sequenceCamera = sequence[camera];
             if (!sequenceCamera) continue;
 
+            if (verbose >= 2) { console.log(`  ${camera}`); }
+            seqBytes += sequenceCamera.bytes;
+
             let seqTimes = Object.keys(sequenceCamera.times).sort();
             let coords = [];
             for (let t = 0; t < seqTimes.length - 1; t++) {
-                let seqTime = seqTimes[t];
+                let seqTime = +seqTimes[t];
+                if (seqTimeStart === 0 || seqTime < seqTimeStart) {
+                    seqTimeStart = seqTime;
+                }
+                if (seqTime > seqTimeEnd) {
+                    seqTimeEnd = seqTime;
+                }
 
                 // 2.1. Symlink the original images into a sequence folder..
+                seqFiles++;
                 let imageFile = sequenceCamera.times[seqTime].file;
                 let pathArr = imageFile.split(path.sep);
                 let basename = pathArr[pathArr.length - 1];
@@ -371,33 +387,38 @@ function processData() {
                 features.push(feature);
             }
         }
-    }
 
-    // 3. export all featues..
-    let dstart = new Date(+times[0]);
+        // 3. export GeoJSON..
+        let dstart = new Date(+times[0]);
 
-    let collectionProperties = {
-        generator: pkg.name,
-        version: pkg.version,
-        source: cwd,
-        slug: getSlugDate(dstart) + '-' + getSlug(),
-        numFiles: Object.keys(allfiles).length,
-        numBytes: bytes,
-        timeStart: times[0],
-        timeEnd: times[times.length - 1]
-    };
+        let collectionProperties = {
+            generator: pkg.name,
+            version: pkg.version,
+            source: cwd,
+            slug: getSlugDate(dstart) + '-' + getSlug() + '-sequence' + s,
+            numFiles: seqFiles,
+            numBytes: seqBytes,
+            timeStart: seqTimeStart,
+            timeEnd: seqTimeEnd
+        };
 
-    let gj = {
-        type: 'FeatureCollection',
-        collectionProperties: collectionProperties,
-        features: features
-    };
+        let gj = {
+            type: 'FeatureCollection',
+            collectionProperties: collectionProperties,
+            features: features
+        };
 
-    fs.writeJson(scfile, gj, function(err) {
-        if (err) {
-            console.log('Write error: ' + err);
+        let geojsonFile = `${cwd}/sequence${s}/sequence${s}.geojson`;
+        if (verbose >= 2) { console.log(`  writing sequence${s}/sequence${s}.geojson`); }
+        try {
+            fs.ensureFileSync(geojsonFile);
+            fs.writeJsonSync(geojsonFile, gj);
+        } catch (err) {
+            if (verbose >= 1) { console.error(err.message); }
+            process.exit(1);
         }
-    });
+
+    }
 }
 
 

@@ -308,7 +308,7 @@ function processData() {
 
             let seqTimes = Object.keys(sequenceCamera.times).sort();
             let coords = [];
-            for (let t = 0; t < seqTimes.length - 1; t++) {
+            for (let t = 0; t < seqTimes.length; t++) {
                 let seqTime = +seqTimes[t];
                 if (seqTimeStart === 0 || seqTime < seqTimeStart) {
                     seqTimeStart = seqTime;

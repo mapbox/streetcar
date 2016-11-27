@@ -66,9 +66,9 @@ let scfolder = `${cwd}/.streetcar`;
     }
 
     let noHiddenFiles = function(item){
-        var basename = path.basename(item)
-        return basename === '.' || basename[0] !== '.'
-    }
+        let basename = path.basename(item);
+        return basename === '.' || basename[0] !== '.';
+    };
 
     // scan the image folders..
     imagefolders.forEach(function(folder) {
@@ -173,7 +173,8 @@ function processFile(item) {
                 if (gps) {
                     gpsdebug = `[${gps.GPSLongitude} ${gps.GPSLongitudeRef}, ${gps.GPSLatitude} ${gps.GPSLatitudeRef}]`;
                 }
-                console.log(`${basename}:  camera = ${camera}, time = ${t}, gps = ${gpsdebug}`);
+                let padcamera = ('     ' + camera).slice(-5);
+                console.log(`${basename}:  camera = ${padcamera}, time = ${t}, gps = ${gpsdebug}`);
             }
             else if (verbose >= 3) {
                 console.log(`---------- ${basename} ----------`);
@@ -214,7 +215,7 @@ function processData() {
 
 
     // 1. split into sequences
-    if (verbose >= 1) { console.log(`Creating sequences`); }
+    if (verbose >= 1) { console.log('Creating sequences'); }
 
     let tPrevious = 0;
     let sequences = [];
@@ -227,6 +228,7 @@ function processData() {
         if (tNow - tPrevious >= cutSequenceTime) {
             if (verbose >= 2) {
                 let tDiff = (tNow - tPrevious) / 1000;
+                console.log('------------------------------');
                 console.log(`tNow = ${tNow}, tPrevious = ${tPrevious}, ${tDiff} second gap - starting new sequence`);
             }
             sequence = {};   // start a new sequence
@@ -267,6 +269,22 @@ function processData() {
                 file: file
             };
         }
+
+
+        if (verbose >= 2) {
+            let debug = '';
+            for (let c = 0; c < cameras.length; c++) {
+                let camera = cameras[c];
+                if (sequence[camera] && sequence[camera].times[tNow]) {
+                    let file = sequence[camera].times[tNow].file;
+                    debug += `${camera}/${path.basename(file)}  `;
+                } else {
+                    debug += Array(camera.length + 16).join(' ');  // pad spaces
+                }
+            }
+            console.log(`${tNow}:  ${debug}`);
+        }
+
 
         // It's possible there were no gps coordinates for any camera at this time.
         // This could happen if the driver went through a tunnel or something.

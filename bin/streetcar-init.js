@@ -20,7 +20,8 @@ const argv = require('minimist')(process.argv.slice(2), {
     },
 });
 
-let cutSequenceTime = 5000;   // in milliseconds
+let cutSequenceTime = 5;   // in seconds
+let minSpeed = 5;          // in km/h
 
 let verbose = 1;  // 0 = quiet, 1 = normal, 2 = debug, 3 = all exif
 let allfiles = {};
@@ -172,6 +173,9 @@ function processFile(item) {
                 let gpsdebug = 'missing!';
                 if (gps) {
                     gpsdebug = `[${gps.GPSLongitude} ${gps.GPSLongitudeRef}, ${gps.GPSLatitude} ${gps.GPSLatitudeRef}]`;
+                    if (gps.hasOwnProperty('GPSSpeed')) {
+                        gpsdebug += `, speed = ${gps.GPSSpeed} ${gps.GPSSpeedRef}`;
+                    }
                 }
                 let padcamera = ('     ' + camera).slice(-5);
                 console.log(`${basename}:  camera = ${padcamera}, time = ${t}, gps = ${gpsdebug}`);
@@ -224,7 +228,7 @@ function processData() {
         let tNow = +times[t];
         let sequence;
 
-        if (tNow - tPrevious >= cutSequenceTime) {
+        if (tNow - tPrevious >= cutSequenceTime * 1000) {
             if (verbose >= 2) {
                 let tDiff = (tNow - tPrevious) / 1000;
                 console.log('------------------------------');
@@ -251,6 +255,13 @@ function processData() {
                 coord = undefined;
             }
 
+            let speed = data.speed;
+            if (!data.hasOwnProperty('speed')) {
+                // TODO: warning
+                speed = undefined;
+            }
+
+
             if (!sequence[camera]) {
                 sequence[camera] = {
                     meta: {},
@@ -263,6 +274,7 @@ function processData() {
             sequence[camera].bytes += bytes;
             sequence[camera].times[tNow] = {
                 coord: coord,
+                speed: speed,
                 file: file
             };
         }
@@ -274,9 +286,12 @@ function processData() {
                 let camera = cameras[c];
                 if (sequence[camera] && sequence[camera].times[tNow]) {
                     let file = sequence[camera].times[tNow].file;
-                    debug += `${camera}/${path.basename(file)}  `;
+                    let speed = sequence[camera].times[tNow].speed;
+                    let padspeed = ('     ' + speed.toFixed(1)).slice(-5);
+                    let underspeed = speed < minSpeed ? '↓' : ' ';
+                    debug += `${camera}/${path.basename(file)} ${padspeed}${underspeed} `;
                 } else {
-                    debug += Array(camera.length + 16).join(' ');  // pad spaces
+                    debug += Array(camera.length + 22).join(' ');  // pad spaces
                 }
             }
             console.log(`${tNow}:  ${debug}`);
@@ -310,6 +325,11 @@ function processData() {
             let coords = [];
             for (let t = 0; t < seqTimes.length; t++) {
                 let seqTime = +seqTimes[t];
+
+                // skip this image if the speed is too low (driver stopped)..
+                let speed = sequenceCamera.times[seqTime].speed;
+                if (Number.isFinite(speed) && speed < minSpeed) continue;
+
                 if (seqTimeStart === 0 || seqTime < seqTimeStart) {
                     seqTimeStart = seqTime;
                 }
@@ -427,18 +447,31 @@ function extractExif(obj) {
 
     let gps = obj.gps;
     props = ['GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude', 'GPSLongitudeRef'];
-    if (gps && hasAllProperties(gps, props)) {
+    if (gps && hasAllProperties(gps, props)) {          // conver dms to [lng, lat]
         newObj.coord = dms2dec(
             gps.GPSLatitude, gps.GPSLatitudeRef,
             gps.GPSLongitude, gps.GPSLongitudeRef
         ).reverse();
 
-        if (gps.hasOwnProperty('GPSAltitude')) {
-            newObj.coord.push(gps.GPSAltitude);
+        if (gps.hasOwnProperty('GPSAltitude')) {        // expect meters
+            let altitude = Number.parseFloat(gps.GPSAltitude);
+            if (Number.isFinite(altitude)) {
+                newObj.coord.push(gps.GPSAltitude);
+            }
         }
 
-        if (gps.hasOwnProperty('GPSSpeed')) {
-            newObj.speed = gps.GPSSpeed;
+        props = ['GPSSpeed', 'GPSSpeedRef'];
+        if (hasAllProperties(gps, props)) {
+            let speed = Number.parseFloat(gps.GPSSpeed);
+            if (Number.isFinite(speed)) {
+                if (gps.GPSSpeedRef === 'K') {          // keep as kph
+                    newObj.speed = speed;
+                } else if (gps.GPSSpeedRef === 'M') {   // convert mph to kph
+                    newObj.speed = speed * 1.60934;
+                } else if (gps.GPSSpeedRef === 'N') {   // convert knots to kph
+                    newObj.speed = speed * 1.852;
+                }
+            }
         }
     }
 

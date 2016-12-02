@@ -162,23 +162,57 @@ function processFile(item) {
             allfiles[item.path].data = copy;
             allfiles[item.path].bytes = item.stats.size;
 
-            let t = imageTime.getTime();
-            if (!alltimes[t]) {
-                alltimes[t] = {};
+            // Try to adjust original times to UTC..
+            let tzoffset = '-8:00'.split(':').map(Number);  // hardcode PST for now
+            // let tzoffset = '-5:00'.split(':').map(Number);  // hardcode EDT for now
+            if (Array.isArray(tzoffset) && tzoffset.length === 2) {
+                imageTime = new Date(imageTime.getTime() -
+                    (tzoffset[0] * 60 * 60 * 1000) -
+                    (tzoffset[1] * 60 * 1000 * Math.sign(tzoffset[0]))
+                );
             }
-            alltimes[t][camera] = item.path;
+            let origTime = imageTime.getTime();
 
-            if (verbose === 2) {
-                let gps = copy.gps;
-                let gpsdebug = 'missing!';
-                if (gps) {
-                    gpsdebug = `[${gps.GPSLongitude} ${gps.GPSLongitudeRef}, ${gps.GPSLatitude} ${gps.GPSLatitudeRef}]`;
-                    if (gps.hasOwnProperty('GPSSpeed')) {
-                        gpsdebug += `, speed = ${gps.GPSSpeed} ${gps.GPSSpeedRef}`;
+            // But prefer GPS time if we have it..
+            let gps = copy.gps;
+            if (gps) {
+                if (gps.hasOwnProperty('GPSDateStamp')) {
+                    let gpsdate = gps.GPSDateStamp.split(':').map(Number);
+                    if (Array.isArray(gpsdate) && gpsdate.length === 3) {
+                        imageTime.setUTCFullYear(gpsdate[0], gpsdate[1]-1, gpsdate[2]);
                     }
                 }
+                if (gps.hasOwnProperty('GPSTimeStamp')) {
+                    let gpstime = gps.GPSTimeStamp.map(Number);
+                    if (Array.isArray(gpstime) && gpstime.length === 3) {
+                        imageTime.setUTCHours(gpstime[0], gpstime[1], gpstime[2]);
+                    }
+                }
+            }
+
+            let time = imageTime.getTime();
+            if (!alltimes[time]) {
+                alltimes[time] = {};
+            }
+            alltimes[time][camera] = item.path;
+
+            if (verbose === 2) {
                 let padcamera = ('     ' + camera).slice(-5);
-                console.log(`${basename}:  camera = ${padcamera}, time = ${t}, gps = ${gpsdebug}`);
+                let gpsdebug = 'NO ';
+                if (gps) {
+                    gpsdebug = 'YES';
+
+                    let drift = ((time - origTime) / 1000).toFixed(1);
+                    let paddrift = ('      ' + drift).slice(-6);
+                    gpsdebug += `, drift = ${paddrift}`;
+
+                    if (gps.hasOwnProperty('GPSSpeed')) {
+                        let speed = (+gps.GPSSpeed).toFixed(2);
+                        let padspeed = ('        ' + `${speed} ${gps.GPSSpeedRef}`).slice(-8);
+                        gpsdebug += `, speed = ${padspeed}`;
+                    }
+                }
+                console.log(`${basename}:  camera = ${padcamera}, time = ${time}, gps = ${gpsdebug}`);
             }
             else if (verbose >= 3) {
                 console.log(`---------- ${basename} ----------`);

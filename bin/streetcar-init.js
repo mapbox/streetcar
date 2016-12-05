@@ -175,25 +175,44 @@ function processFile(item) {
 
             // But prefer GPS time if we have it..
             let gps = copy.gps;
-            if (gps) {
-                if (gps.hasOwnProperty('GPSDateStamp')) {
-                    let gpsdate = gps.GPSDateStamp.split(':').map(Number);
-                    if (Array.isArray(gpsdate) && gpsdate.length === 3) {
-                        imageTime.setUTCFullYear(gpsdate[0], gpsdate[1]-1, gpsdate[2]);
-                    }
-                }
-                if (gps.hasOwnProperty('GPSTimeStamp')) {
-                    let gpstime = gps.GPSTimeStamp.map(Number);
-                    if (Array.isArray(gpstime) && gpstime.length === 3) {
-                        imageTime.setUTCHours(gpstime[0], gpstime[1], gpstime[2]);
-                    }
-                }
-            }
+            // if (gps) {
+            //     if (gps.hasOwnProperty('GPSDateStamp')) {
+            //         let gpsdate = gps.GPSDateStamp.split(':').map(Number);
+            //         if (Array.isArray(gpsdate) && gpsdate.length === 3) {
+            //             imageTime.setUTCFullYear(gpsdate[0], gpsdate[1]-1, gpsdate[2]);
+            //         }
+            //     }
+            //     if (gps.hasOwnProperty('GPSTimeStamp')) {
+            //         let gpstime = gps.GPSTimeStamp.map(Number);
+            //         if (Array.isArray(gpstime) && gpstime.length === 3) {
+            //             imageTime.setUTCHours(gpstime[0], gpstime[1], gpstime[2]);
+            //         }
+            //     }
+            // }
 
             let time = imageTime.getTime();
             if (!alltimes[time]) {
                 alltimes[time] = {};
             }
+
+
+            // terrible hack to avoid issue with duplicate timestamps (see #5).
+            // this time-camera combination already has an image set for it.
+            let tKey = time;
+            if (alltimes[tKey].hasOwnProperty(camera)) {
+                if (!alltimes[tKey - 1000]) { alltimes[tKey - 1000] = {}; }
+                if (!alltimes[tKey - 1000].hasOwnProperty(camera)) {
+console.log(`    oh no ${tKey} already has a ${camera} - lets move that one to ${tKey - 1000}`);
+                    // store existing image back one second in a free slot
+                    alltimes[tKey - 1000][camera] = alltimes[tKey][camera];
+                } else {
+console.log(`    uh oh ${tKey} already has a ${camera} - lets put this one at ${tKey + 1000}`);
+                    // store new image ahead one second and hope times fix themselves later
+                    tKey = tKey + 1000;
+                    alltimes[tKey] = {};
+                }
+            }
+
             alltimes[time][camera] = item.path;
 
             if (verbose === 2) {
@@ -255,18 +274,18 @@ function processData() {
     // 1. split into sequences
     if (verbose >= 1) { console.log('Creating sequences'); }
 
-    let tPrevious = 0;
+    let tPrev = 0;
     let sequences = [];
 
     for (let t = 0; t < times.length; t++) {
-        let tNow = +times[t];
+        let tCurr = +times[t];
         let sequence;
 
-        if (tNow - tPrevious >= cutSequenceTime * 1000) {
+        if (tCurr - tPrev >= cutSequenceTime * 1000) {
             if (verbose >= 2) {
-                let tDiff = (tNow - tPrevious) / 1000;
+                let tDiff = (tCurr - tPrev) / 1000;
                 console.log('------------------------------');
-                console.log(`tNow = ${tNow}, tPrevious = ${tPrevious}, ${tDiff} second gap - starting new sequence`);
+                console.log(`tCurr = ${tCurr}, tPrev = ${tPrev}, ${tDiff} second gap - starting new sequence`);
             }
             sequence = {};   // start a new sequence
             sequences.push(sequence);
@@ -277,7 +296,7 @@ function processData() {
         for (let c = 0; c < cameras.length; c++) {
             let camera = cameras[c];
 
-            let file = alltimes[tNow][camera];
+            let file = alltimes[tCurr][camera];
             if (!file) continue;
 
             let data = extractExif(allfiles[file].data);
@@ -306,7 +325,7 @@ function processData() {
 
             setCameraMetadata(sequence[camera].meta, data);
             sequence[camera].bytes += bytes;
-            sequence[camera].times[tNow] = {
+            sequence[camera].times[tCurr] = {
                 coord: coord,
                 speed: speed,
                 file: file
@@ -318,9 +337,10 @@ function processData() {
             let debug = '';
             for (let c = 0; c < cameras.length; c++) {
                 let camera = cameras[c];
-                if (sequence[camera] && sequence[camera].times[tNow]) {
-                    let file = sequence[camera].times[tNow].file;
-                    let speed = sequence[camera].times[tNow].speed;
+                if (sequence[camera] && sequence[camera].times[tCurr]) {
+                    let file = sequence[camera].times[tCurr].file;
+                    let speed = sequence[camera].times[tCurr].speed;
+                    let reorder = sequence[camera].times[tCurr].reorder;
                     let padspeed = ('     ' + speed.toFixed(1)).slice(-5);
                     let underspeed = speed < minSpeed ? '↓' : ' ';
                     debug += `${camera}/${path.basename(file)} ${padspeed}${underspeed} `;
@@ -328,11 +348,11 @@ function processData() {
                     debug += Array(camera.length + 22).join(' ');  // pad spaces
                 }
             }
-            console.log(`${tNow}:  ${debug}`);
+            console.log(`${tCurr}:  ${debug}`);
         }
 
 
-        tPrevious = tNow;
+        tPrev = tCurr;
     }
 
 

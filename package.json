@@ -39,5 +39,6 @@
   "scripts": {
     "lint": "eslint index.js bin/ test/",
     "test": "npm run lint && tap --cov test/*.js"
-  }
+  },
+  "private": true
 }

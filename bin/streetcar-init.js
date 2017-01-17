@@ -87,7 +87,7 @@ let scfolder = `${cwd}/.streetcar`;
                 if (--foldercount === 0) {
                     finished = true;
                     if (!waitfor) {
-                        finalize();
+                        doneFiles();
                     }
                 }
             });
@@ -140,7 +140,6 @@ function processFile(item) {
         allcameras[camera] = camera;
     }
 
-    allfiles[item.path] = {};
     waitfor++;
 
     exif.read(item.path)
@@ -159,79 +158,18 @@ function processFile(item) {
             }
 
             let copy = deepCopy(data);
-            allfiles[item.path].data = copy;
-            allfiles[item.path].bytes = item.stats.size;
 
-            // Try to adjust original times to UTC..
-            let tzoffset = '-8:00'.split(':').map(Number);  // hardcode PST for now
-            // let tzoffset = '-5:00'.split(':').map(Number);  // hardcode EDT for now
-            if (Array.isArray(tzoffset) && tzoffset.length === 2) {
-                imageTime = new Date(imageTime.getTime() -
-                    (tzoffset[0] * 60 * 60 * 1000) -
-                    (tzoffset[1] * 60 * 1000 * Math.sign(tzoffset[0]))
-                );
+            allfiles[item.path] = {
+                basename: basename,
+                camera: camera,
+                data: copy,
+                bytes: item.stats.size
             }
-            let origTime = imageTime.getTime();
-
-            // But prefer GPS time if we have it..
-            let gps = copy.gps;
-            // if (gps) {
-            //     if (gps.hasOwnProperty('GPSDateStamp')) {
-            //         let gpsdate = gps.GPSDateStamp.split(':').map(Number);
-            //         if (Array.isArray(gpsdate) && gpsdate.length === 3) {
-            //             imageTime.setUTCFullYear(gpsdate[0], gpsdate[1]-1, gpsdate[2]);
-            //         }
-            //     }
-            //     if (gps.hasOwnProperty('GPSTimeStamp')) {
-            //         let gpstime = gps.GPSTimeStamp.map(Number);
-            //         if (Array.isArray(gpstime) && gpstime.length === 3) {
-            //             imageTime.setUTCHours(gpstime[0], gpstime[1], gpstime[2]);
-            //         }
-            //     }
-            // }
-
-            let time = imageTime.getTime();
-            if (!alltimes[time]) {
-                alltimes[time] = {};
-            }
-
-
-            // terrible hack to avoid issue with duplicate timestamps (see #5).
-            // this time-camera combination already has an image set for it.
-            let tKey = time;
-            if (alltimes[tKey].hasOwnProperty(camera)) {
-                if (!alltimes[tKey - 1000]) { alltimes[tKey - 1000] = {}; }
-                if (!alltimes[tKey - 1000].hasOwnProperty(camera)) {
-console.log(`    oh no ${tKey} already has a ${camera} - lets move that one to ${tKey - 1000}`);
-                    // store existing image back one second in a free slot
-                    alltimes[tKey - 1000][camera] = alltimes[tKey][camera];
-                } else {
-console.log(`    uh oh ${tKey} already has a ${camera} - lets put this one at ${tKey + 1000}`);
-                    // store new image ahead one second and hope times fix themselves later
-                    tKey = tKey + 1000;
-                    alltimes[tKey] = {};
-                }
-            }
-
-            alltimes[time][camera] = item.path;
 
             if (verbose === 2) {
                 let padcamera = ('     ' + camera).slice(-5);
-                let gpsdebug = 'NO ';
-                if (gps) {
-                    gpsdebug = 'YES';
-
-                    let drift = ((time - origTime) / 1000).toFixed(1);
-                    let paddrift = ('      ' + drift).slice(-6);
-                    gpsdebug += `, drift = ${paddrift}`;
-
-                    if (gps.hasOwnProperty('GPSSpeed')) {
-                        let speed = (+gps.GPSSpeed).toFixed(2);
-                        let padspeed = ('        ' + `${speed} ${gps.GPSSpeedRef}`).slice(-8);
-                        gpsdebug += `, speed = ${padspeed}`;
-                    }
-                }
-                console.log(`${basename}:  camera = ${padcamera}, time = ${time}, gps = ${gpsdebug}`);
+                let gpsdebug = copy.gps ? 'YES' : 'NO ';
+                console.log(`${basename}:  camera = ${padcamera}, gps = ${gpsdebug}`);
             }
             else if (verbose >= 3) {
                 console.log(`---------- ${basename} ----------`);
@@ -240,7 +178,7 @@ console.log(`    uh oh ${tKey} already has a ${camera} - lets put this one at ${
         })
         .finally(() => {
             if (!--waitfor && finished) {
-                finalize();
+                doneFiles();
             }
         });
 
@@ -252,8 +190,8 @@ console.log(`    uh oh ${tKey} already has a ${camera} - lets put this one at ${
 }
 
 
-function finalize() {
-    processData();
+function doneFiles() {
+    processTimes();
     if (verbose >= 1 && process.stdout.isTTY) {
         process.stdout.write('\n', () => {
             console.log(Object.keys(allfiles).length + ' file(s)');
@@ -262,14 +200,84 @@ function finalize() {
 }
 
 
-function processData() {
+function processTimes() {
     if (verbose >= 1 && process.stdout.isTTY) {
         process.stdout.write('\n');
+        console.log('Normalizing times');
     }
 
+
+    let files = Object.keys(allfiles).sort();
+    for (let i = 0; i < files.length; i++) {
+        let key = files[i];
+        let file = allfiles[key];
+        let data = file.data;
+        let camera = file.camera;
+
+        let imageTime = data.exif.DateTimeOriginal || data.exif.DateTimeDigitized;
+
+        // Try to adjust original times to UTC..
+        let tzoffset = '-8:00'.split(':').map(Number);  // hardcode PST for now
+        // let tzoffset = '-5:00'.split(':').map(Number);  // hardcode EDT for now
+        if (Array.isArray(tzoffset) && tzoffset.length === 2) {
+            imageTime = new Date(imageTime.getTime() -
+                (tzoffset[0] * 60 * 60 * 1000) -
+                (tzoffset[1] * 60 * 1000 * Math.sign(tzoffset[0]))
+            );
+        }
+        let origTime = imageTime.getTime();
+
+        // But prefer GPS time if we have it..
+        let gps = data.gps;
+        // if (gps) {
+        //     if (gps.hasOwnProperty('GPSDateStamp')) {
+        //         let gpsdate = gps.GPSDateStamp.split(':').map(Number);
+        //         if (Array.isArray(gpsdate) && gpsdate.length === 3) {
+        //             imageTime.setUTCFullYear(gpsdate[0], gpsdate[1]-1, gpsdate[2]);
+        //         }
+        //     }
+        //     if (gps.hasOwnProperty('GPSTimeStamp')) {
+        //         let gpstime = gps.GPSTimeStamp.map(Number);
+        //         if (Array.isArray(gpstime) && gpstime.length === 3) {
+        //             imageTime.setUTCHours(gpstime[0], gpstime[1], gpstime[2]);
+        //         }
+        //     }
+        // }
+
+        let time = imageTime.getTime();
+        if (!alltimes[time]) {
+            alltimes[time] = {};
+        }
+
+
+        // terrible hack to avoid issue with duplicate timestamps (see #5).
+        // this time-camera combination already has an image set for it.
+        let tKey = time;
+        if (alltimes[tKey].hasOwnProperty(camera)) {
+            if (!alltimes[tKey - 1000]) { alltimes[tKey - 1000] = {}; }
+            if (!alltimes[tKey - 1000].hasOwnProperty(camera)) {
+console.log(`    oh no ${tKey} already has a ${camera} - lets move that one to ${tKey - 1000}`);
+                // store existing image back one second in a free slot
+                alltimes[tKey - 1000][camera] = alltimes[tKey][camera];
+            } else {
+console.log(`    uh oh ${tKey} already has a ${camera} - lets put this one at ${tKey + 1000}`);
+                // store new image ahead one second and hope times fix themselves later
+                tKey = tKey + 1000;
+                alltimes[tKey] = {};
+            }
+        }
+
+        alltimes[tKey][camera] = key;
+    }
+
+    processSequences();
+}
+
+
+
+function processSequences() {
     let times = Object.keys(alltimes).sort();
     let cameras = Object.keys(allcameras);
-
 
     // 1. split into sequences
     if (verbose >= 1) { console.log('Creating sequences'); }
@@ -340,9 +348,15 @@ function processData() {
                 if (sequence[camera] && sequence[camera].times[tCurr]) {
                     let file = sequence[camera].times[tCurr].file;
                     let speed = sequence[camera].times[tCurr].speed;
-                    let reorder = sequence[camera].times[tCurr].reorder;
-                    let padspeed = ('     ' + speed.toFixed(1)).slice(-5);
-                    let underspeed = speed < minSpeed ? '↓' : ' ';
+                    let padspeed, underspeed;
+
+                    if (Number.isFinite(speed)) {
+                        padspeed = ('     ' + speed.toFixed(1)).slice(-5);
+                        underspeed = speed < minSpeed ? '↓' : ' ';
+                    } else {
+                        padspeed = ' null';
+                        underspeed = ' ';
+                    }
                     debug += `${camera}/${path.basename(file)} ${padspeed}${underspeed} `;
                 } else {
                     debug += Array(camera.length + 22).join(' ');  // pad spaces
@@ -578,10 +592,10 @@ function deepCopy(obj, withBuffers) {
                 length: obj.byteLength
             };
         }
-    }
-    else if (typeof obj !== 'object' || Array.isArray(obj)) {
+    } else if (typeof obj !== 'object' || Array.isArray(obj) || obj instanceof Date) {
         return obj;
     }
+
 
     let newObj = {};
     for (let key in obj) {

@@ -80,7 +80,7 @@ let scfolder = `${cwd}/.streetcar`;
             .on('readable', function() {
                 let item;
                 while ((item = this.read())) {  // eslint-disable-line no-invalid-this
-                    processFile(item);
+                    processFile(item, basename);
                 }
             })
             .on('end', function() {
@@ -117,23 +117,8 @@ function getSlug(slugDate) {
 }
 
 
-function getCamera(filepath) {
-    let s = filepath.toLowerCase();
-    if (s.indexOf('streetcar') !== -1) return null;
-
-    if (s.lastIndexOf('front') !== -1) return 'front';
-    if (s.lastIndexOf('back') !== -1) return 'back';
-    if (s.lastIndexOf('rear') !== -1) return 'back';
-    if (s.lastIndexOf('left') !== -1) return 'left';
-    if (s.lastIndexOf('right') !== -1) return 'right';
-    return null;
-}
-
-
-function processFile(item) {
+function processFile(item, camera) {
     if (!item.stats.isFile()) return;
-
-    let camera = getCamera(item.path);
     if (!camera) return;
 
     if (!allcameras[camera]) {
@@ -357,7 +342,8 @@ function processSequences() {
                         padspeed = ' null';
                         underspeed = ' ';
                     }
-                    debug += `${camera}/${path.basename(file)} ${padspeed}${underspeed} `;
+                    let basename = path.basename(file);
+                    debug += `${camera}/${basename} ${padspeed}${underspeed} `;
                 } else {
                     debug += Array(camera.length + 22).join(' ');  // pad spaces
                 }
@@ -433,7 +419,7 @@ function processSequences() {
                 let meta = sequenceCamera.meta;
                 let cameraAngle =
                     (camera === 'right') ? 90 :
-                    (camera === 'back') ? 180 :
+                    (camera === 'back' || camera === 'rear') ? 180 :
                     (camera === 'left') ? 270 : 0;
 
                 let featureProperties = {

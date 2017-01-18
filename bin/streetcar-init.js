@@ -466,8 +466,8 @@ function processSequences() {
             features: features
         };
 
-        let geojsonFile = `${scfolder}/sequence${s}/sequence${s}.geojson`;
-        if (verbose >= 2) { console.log(`  writing .streetcar/sequence${s}/sequence${s}.geojson`); }
+        let geojsonFile = `${scfolder}/sequence${s}.geojson`;
+        if (verbose >= 2) { console.log(`  writing .streetcar/sequence${s}.geojson`); }
         try {
             fs.ensureFileSync(geojsonFile);
             fs.writeJsonSync(geojsonFile, gj);

@@ -30,7 +30,7 @@ const argv = require('minimist')(process.argv.slice(2), {
 
     // find geojson files
     let fileCount = 0;
-    let files = glob.sync(`${scfolder}/sequence*/sequence*.geojson`);
+    let files = glob.sync(`${scfolder}/geojson/*.geojson`);
     files.forEach(function(file) {
         let gj;
         try {

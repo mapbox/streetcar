@@ -397,7 +397,7 @@ function processSequences() {
                 let pathArr = imageFile.split(path.sep);
                 let basename = pathArr[pathArr.length - 1];
                 let container = pathArr[pathArr.length - 2];
-                let linkFile = `${scfolder}/sequence${s}/${camera}/${container}/${basename}`;
+                let linkFile = `${scfolder}/sequence/${s}/${camera}/${container}/${basename}`;
 
                 try {
                     fs.ensureSymlinkSync(imageFile, linkFile);
@@ -466,8 +466,8 @@ function processSequences() {
             features: features
         };
 
-        let geojsonFile = `${scfolder}/sequence${s}.geojson`;
-        if (verbose >= 2) { console.log(`  writing .streetcar/sequence${s}.geojson`); }
+        let geojsonFile = `${scfolder}/geojson/${s}.geojson`;
+        if (verbose >= 2) { console.log(`  writing .streetcar/geojson/${s}.geojson`); }
         try {
             fs.ensureFileSync(geojsonFile);
             fs.writeJsonSync(geojsonFile, gj);
@@ -602,9 +602,10 @@ This program will:
 2. Find image files recursively in and below the current folder
 3. Parse EXIF data from the image files to gather capture times and GPS coordinates.
 4. Split into sequences (a gap of >5sec starts a new sequence)
-5. Create sequence folders under .streeetcar
+5. Create sequence folders under .streeetcar/sequence/N
 6. Symlink the image files into the appropriate sequence folder
-7. Generate GeoJSON files for each sequence, with the image coordinates as a LineString
+7. Generate GeoJSON files for each sequence under .streetcar/geojson/
+   with the image coordinates as a LineString
 
 Usage:
   $ streetcar-init
@@ -618,7 +619,8 @@ Options:
 Example:
   $ streetcar-init
 
-  GeoJSON will be generated in: .streetcar/streetcar.geojson
+  Sequences will be generated in: .streetcar/sequence/N/
+  GeoJSONs will be generated in: .streetcar/geojson/N.geojson
 
 `;
     console.log(help);

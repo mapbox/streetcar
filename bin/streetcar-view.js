@@ -29,7 +29,7 @@ const argv = require('minimist')(process.argv.slice(2), {
     let scfolder = getStreetcarFolder();
 
     // find geojson files
-    let files = glob.sync(`${scfolder}/sequence*/sequence*.geojson`);
+    let files = glob.sync(`${scfolder}/geojson/*.geojson`);
     files.forEach(function(file) {
         let cmd = path.normalize(`${__dirname}/../node_modules/geojsonio-cli/geojsonio.js`);
 
@@ -66,7 +66,7 @@ function showHelp() {
     let help = `
 streetcar-view
 
-View all sequence files under .streetcar folder on geojson.io
+View all sequence files under .streetcar/geojson/ folder on geojson.io
 
 Usage:
   $ streetcar-view

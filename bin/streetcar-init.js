@@ -149,7 +149,7 @@ function processFile(item, camera) {
                 camera: camera,
                 data: copy,
                 bytes: item.stats.size
-            }
+            };
 
             if (verbose === 2) {
                 let padcamera = ('     ' + camera).slice(-5);

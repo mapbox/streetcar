@@ -1,15 +1,11 @@
 {
-  "name": "streetcar",
+  "name": "@mapbox/streetcar",
   "description": "Tools for processing streetlevel imagery",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "main": "index.js",
   "license": "ISC",
   "author": "Bryan Housel <bryan@mapbox.com>",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/mapbox/streetcar.git"
-  },
-  "bugs": "https://github.com/mapbox/streetcar/issues",
+  "repository": "mapbox/streetcar",
   "directories": {
     "bin": "./bin"
   },
@@ -37,7 +33,7 @@
     "node": ">=6.0.0"
   },
   "scripts": {
-    "lint": "eslint index.js bin/ test/",
-    "test": "npm run lint && tap --cov test/*.js"
+    "lint": "eslint index.js bin/",
+    "test": "npm run lint"
   }
 }

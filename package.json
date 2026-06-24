@@ -1,7 +1,7 @@
 {
   "name": "@mapbox/streetcar",
   "description": "Tools for processing streetlevel imagery",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "main": "index.js",
   "license": "ISC",
   "author": "Bryan Housel <bryan@mapbox.com>",
@@ -35,5 +35,8 @@
   "scripts": {
     "lint": "eslint index.js bin/",
     "test": "npm run lint"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
